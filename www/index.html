@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Reciprocal Zenith Angles — Measuring the Shape of the Earth</title>
+<meta name="description" content="An interactive 3D visualization of how two surveyors with theodolites measure the curvature of the Earth — and why the numbers can never work on a flat earth.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌍</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="scene"></div>
+  <div id="labels"></div>
+
+  <!-- header -->
+  <div id="hdr" class="glass">
+    <div>
+      <h1>Reciprocal Zenith Angles</h1>
+      <div class="sub">measuring the shape of the Earth with two telescopes</div>
+    </div>
+    <button id="btn-about" title="About & real-world notes">i</button>
+  </div>
+
+  <!-- live equation banner -->
+  <div id="eq" class="glass">
+    <span class="za" id="eq-za">—</span> + <span class="zb" id="eq-zb">—</span> =
+    <span class="sum" id="eq-sum">—</span> = 180° + <span class="th" id="eq-th">—</span><span id="eq-rho-wrap" style="display:none"> − <span class="rho" id="eq-rho">—</span></span>
+    <small id="eq-note">the two zenith angles always overshoot 180° by exactly the curvature between the towers</small>
+  </div>
+
+  <!-- numeric readouts -->
+  <div id="readouts" class="glass">
+    <h3>Measurements</h3>
+    <div class="row"><span class="k">surface distance d</span><span class="v" id="ro-d">—</span></div>
+    <div class="row"><span class="k">tower height needed</span><span class="v" id="ro-hmin">—</span></div>
+    <div class="row"><span class="k">zenith angle z<sub>A</sub></span><span class="v a" id="ro-za">—</span></div>
+    <div class="row"><span class="k">zenith angle z<sub>B</sub></span><span class="v b" id="ro-zb">—</span></div>
+    <div class="row"><span class="k">sum z<sub>A</sub>+z<sub>B</sub></span><span class="v" id="ro-sum">—</span></div>
+    <div class="row"><span class="k">excess over 180°</span><span class="v th" id="ro-ex">—</span></div>
+    <div class="row" id="row-rho" style="display:none"><span class="k">lost to refraction ρ</span><span class="v rf" id="ro-rho">—</span></div>
+    <div class="divider"></div>
+    <div class="row hl"><span class="k" id="ro-rimp-k">implied Earth radius</span><span class="v" id="ro-rimp">—</span></div>
+    <div class="row hl" id="row-rcorr" style="display:none"><span class="k">corrected for air (k)</span><span class="v" id="ro-rcorr">—</span></div>
+    <div class="row"><span class="k">actual model radius</span><span class="v" id="ro-ract">—</span></div>
+    <div class="verdict" id="ro-verdict"></div>
+  </div>
+
+  <!-- guided tour -->
+  <div id="tour" class="glass">
+    <div class="step-tag" id="tour-tag">step 1 of 13</div>
+    <h2 id="tour-title">—</h2>
+    <div class="body" id="tour-body"></div>
+    <nav>
+      <button class="btn" id="tour-prev">‹ Back</button>
+      <div class="dots" id="tour-dots"></div>
+      <button class="btn primary" id="tour-next">Next ›</button>
+    </nav>
+    <div style="text-align:center"><button class="skip" id="tour-skip">skip tour — go straight to the playground</button></div>
+  </div>
+
+  <!-- controls -->
+  <button id="fab" title="Controls">⚙</button>
+  <div id="controls" class="glass">
+    <h3>Controls</h3>
+    <div class="grp">
+      <div class="seg mode">
+        <button id="mode-globe" class="on">🌍 Globe</button>
+        <button id="mode-flat" class="flat">🥞 Flat</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="sl">distance between towers <span class="val" id="val-d">—</span></label>
+      <input type="range" id="sl-d" min="50" max="1200" step="10" value="400">
+      <div class="note" id="d-note"></div>
+    </div>
+    <div class="grp">
+      <label class="sl">Earth radius (model) <span class="val" id="val-r">—</span></label>
+      <input type="range" id="sl-r" min="500" max="7000" step="50" value="1000">
+      <div class="seg" style="margin-top:5px">
+        <button id="preset-mini">toy 1,000</button>
+        <button id="preset-real">real 6,371</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="sl">atmospheric refraction <span class="val" id="val-k">—</span></label>
+      <input type="range" id="sl-k" min="0" max="1" step="0.01" value="0">
+      <select id="k-scen" title="standard refraction coefficients by scenario">
+        <option value="custom">custom — drag the slider</option>
+        <option value="0">0.00 · vacuum — no air at all</option>
+        <option value="0.13">0.13 · hilltop ↔ hilltop, mild day</option>
+        <option value="0.167">0.17 · over land, line well above ground</option>
+        <option value="0.333">0.33 · low over land · overcast water</option>
+        <option value="0.5">0.50 · low over water, late in the day</option>
+        <option value="0.75">0.75 · warm air over cold water/ice</option>
+        <option value="1">1.00 · extreme duct — light follows Earth</option>
+      </select>
+      <div class="note" id="k-note"></div>
+    </div>
+    <div class="grp views">
+      <label class="sl">camera</label>
+      <div class="seg">
+        <button id="view-side" class="on">Side</button>
+        <button id="view-earth">Whole Earth</button>
+        <button id="view-top">Top</button>
+      </div>
+      <div class="seg">
+        <button id="view-fpA">👁 Observer A</button>
+        <button id="view-fpB">👁 Observer B</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label class="chk"><input type="checkbox" id="tg-plumb" checked> extend plumb lines (to the center)</label>
+      <label class="chk"><input type="checkbox" id="tg-cutaway"> cutaway Earth (see inside)</label>
+      <label class="chk"><input type="checkbox" id="tg-level" checked> level rings (each tower's horizontal)</label>
+      <label class="chk"><input type="checkbox" id="tg-arcs" checked> angle arcs</label>
+      <label class="chk"><input type="checkbox" id="tg-labels" checked> labels</label>
+    </div>
+  </div>
+
+  <!-- first-person HUD -->
+  <div id="fphud">
+    <div class="who" id="fp-who">standing on <b>tower A</b> — drag to look around</div>
+    <div class="reticle"></div>
+    <div class="hudline" id="hud-level"><span class="tag" id="hud-level-tag">LEVEL · 90.00°</span></div>
+    <div class="hudtarget" id="hud-target"><div class="ring"></div><span class="tag" id="hud-target-tag">tower B</span></div>
+    <div class="hudtrue" id="hud-true"><div class="ring"></div><span class="tag">true position (without air)</span></div>
+    <div class="dip" id="hud-dip"><span class="tag" id="hud-dip-tag">dip 0°</span></div>
+  </div>
+  <button class="btn" id="btn-exit-fp">↩ exit first-person</button>
+
+  <div id="toast" class="glass"></div>
+
+  <!-- intro overlay -->
+  <div class="overlay" id="intro">
+    <div class="card glass">
+      <h2>Reciprocal Zenith Angles</h2>
+      <div class="tagline">two telescopes · one geometry lesson · zero escape routes</div>
+      <p>Two surveyors climb two towers and aim their telescopes <b>at each other</b>.
+      Each one measures a single angle: how far below "straight up" they have to tilt
+      to see their friend.</p>
+      <p>Those two numbers, added together, <b>measure the shape of the world</b> —
+      and they give an answer a flat earth cannot produce. This is real geodesy,
+      used by surveyors for two centuries. In five minutes you'll understand it
+      better than most textbooks explain it.</p>
+      <div class="actions">
+        <button class="btn primary" id="btn-start-tour">▶ Start the guided tour</button>
+        <button class="btn" id="btn-skip-intro">Explore freely</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- about overlay -->
+  <div class="overlay hidden" id="about">
+    <div class="card glass">
+      <button class="close-x" id="btn-close-about">×</button>
+      <h2>About this visualization</h2>
+      <div class="tagline">real-world notes &amp; fine print</div>
+      <p><b>The principle.</b> The <i>zenith</i> is the direction exactly opposite gravity — what a plumb
+      line points away from. A theodolite measures the <i>zenith angle</i>: how far you tilt down from
+      zenith to aim at a target. When two stations aim at each other ("reciprocal" observation), the two
+      angles must sum to exactly <b>180°</b> if their plumb lines are parallel — basic geometry of a
+      straight line crossing two parallels. On a curved Earth the plumb lines are <i>not</i> parallel:
+      they converge at the planet's center, tilted by the central angle θ between the stations. The sum
+      then comes out to <b>180° + θ</b>, every time. Measure the overshoot, divide the distance by it
+      (in radians), and you get the radius of the Earth: <b>R = d ÷ θ</b>.</p>
+      <h4>Doesn't air bend the light?</h4>
+      <p>Yes — and that's the genius of the <i>reciprocal</i> method. Atmospheric refraction bends both
+      lines of sight <b>downward</b> (air gets denser lower down), which makes each measured zenith angle
+      slightly <i>smaller</i>. Refraction therefore <i>shrinks</i> the overshoot — it works <b>against</b>
+      the curvature signal, never for it. Surveyors observe both directions simultaneously so the bending
+      is the same on each side and can be solved for and removed. A flat earth would need light bending
+      <b>upward</b>, by exactly the right amount at every distance, in every climate, to fake these
+      numbers. Air does the opposite.</p>
+      <p><b>See it yourself:</b> the <i>atmospheric refraction</i> slider in the controls bends the sight
+      lines live. The value k is the surveyor's <i>refraction coefficient</i> — how sharply the ray curves
+      compared with the planet itself (k&nbsp;=&nbsp;R<sub>Earth</sub>&nbsp;÷&nbsp;R<sub>ray</sub>).
+      k&nbsp;=&nbsp;0 is vacuum; <b>k&nbsp;≈&nbsp;0.13</b> is typical air, a curve about 8× gentler than
+      the Earth's; k&nbsp;=&nbsp;1 is light hugging the surface — a duct that only ever forms for rays
+      grazing metres above cold water or ice, never along an elevated survey line. Each measured angle
+      loses δ&nbsp;≈&nbsp;k·θ/2, so the sum loses k·θ: at any k the globe's overshoot only ever
+      <i>shrinks</i> toward 180°, while on the flat earth the same air drags the sum <i>below</i> 180°.
+      Either way, refraction is bookkeeping — never an escape hatch.</p>
+      <p><b>Standard values, real conditions.</b> Surveying references tabulate k by scenario — the
+      preset list in the controls: <b>0</b> vacuum; <b>0.13–0.15</b> between hilltops on a mild day;
+      <b>0.17</b> over land with the line well above the ground; <b>0.33</b> low over land or above
+      water under overcast; <b>0.5</b> low over water late in the day; <b>0.75–1.0</b> skimming
+      much-warmer air over cold water or ice — mirage territory. The wild numbers exist only for rays
+      grazing within a few metres of the surface, where the temperature gradient is steep: research
+      lines 1–5&nbsp;m over grass or water have logged freak moments from −4 to +16. Elevated
+      reciprocal-zenith lines between towers and summits live at <b>k&nbsp;≈&nbsp;0.13–0.17</b>, and
+      observing both ends simultaneously measures the bending so it can be removed. (Scenario table and
+      research roundup: <a href="https://mctoon.net/refraction/" style="color:#4cc9f0">mctoon.net/refraction</a>.)</p>
+      <h4>Is this really used?</h4>
+      <p>Constantly. It's called <i>trigonometric leveling with reciprocal vertical angles</i> — standard
+      practice in geodetic surveys since the 1800s (the great triangulations of France, Britain and India
+      all relied on it). It's why long bridges and tunnels must budget for curvature: the two ends of the
+      35&nbsp;km Channel Tunnel survey would miss by meters if Earth were modeled flat.</p>
+      <h4>What's exaggerated here?</h4>
+      <p>By default you're looking at a <b>toy planet ~1,000 km in radius</b> so the angles are big enough
+      to see. Tower heights auto-scale so the sight line clears the ground. Switch the radius slider to
+      6,371 km (the real Earth) and the numbers become exactly what real surveyors measure — the excess
+      gets small (about 0.9° per 100 km), but it never becomes zero, and it always implies the same radius.
+      On a flat earth the excess is 0.000° at <i>every</i> distance. That difference is the whole point.</p>
+      <p style="color:#93a7c9;font-size:0.8rem">Built with three.js · part of the
+      <a href="https://flerfwatch.com" style="color:#4cc9f0">flerfwatch.com</a> collection</p>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
